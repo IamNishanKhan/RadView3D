@@ -1,130 +1,158 @@
-# RadView3D
+<div align="center">
+  <img src="src-tauri/icons/1024x1024.png" alt="RadView3D icon" width="156" />
 
-Desktop CT + contour viewer for **Elekta/CMS Monaco** patient folders. v1 is Monaco only (no Varian, dose, or export).
+  # RadView3D
 
-Rust loads DICOM and `.WC` contours **once**. The UI (Vite + TypeScript + canvas) scrolls three orthogonal views in memory. Scroll never calls Rust.
+  **A native CT and radiotherapy contour viewer for Elekta/CMS Monaco patient folders.**
 
-On start the app opens `../Monaco/1~20230127` if that path exists. Use **Open folder** for another patient. Prefer `1~CT2` (real contours). `1~CT1` is CT with empty contour stubs.
+  [![Rust](https://img.shields.io/badge/Rust-1.99%2B-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+  [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+  [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
+  [![Open source](https://img.shields.io/badge/Open%20source-welcome-2EA44F?style=flat-square)](#open-source)
+</div>
 
-## What a patient folder looks like
+---
 
-Open the patient directory (for example `1~20230127`), not a single `1~CTn` study. Each study is a subfolder:
+## What is RadView3D?
 
+RadView3D is a focused desktop viewer for CT volumes and structure contours exported from **Elekta/CMS Monaco**. The Rust backend loads and prepares the study once; the TypeScript frontend keeps the volume in memory for responsive orthogonal slice navigation.
+
+### Highlights
+
+- Axial, coronal, and sagittal CT views
+- Monaco DICOM CT and `.WC` contour support
+- Structure visibility controls and contour overlays
+- Soft-tissue, lung, and bone window presets
+- Mouse wheel, sliders, and keyboard slice navigation
+- Dark startup and loading states designed to avoid bright flashes
+- Confirmed folder closing and application exit
+- Native Tauri desktop application with standalone binaries
+
+> **Current scope:** Monaco patient folders are supported in this version. Varian data, dose viewing, and export workflows are not currently included.
+
+## Download and run
+
+Prebuilt applications are published on the repository’s [GitHub Releases page](../../releases).
+
+### Windows standalone executable
+
+1. Open [GitHub Releases](../../releases).
+2. Download the Windows standalone `.exe` asset.
+3. Run `RadView3D.exe` directly.
+
+The standalone executable does not require Node.js, npm, Vite, or a development server. Windows 10/11 should have the WebView2 Runtime available; if Windows asks for it, install the [Microsoft WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
+
+### Linux binary
+
+1. Open [GitHub Releases](../../releases).
+2. Download the Linux binary, typically named `radview3d-linux`.
+3. Make it executable and run it:
+
+```bash
+chmod +x radview3d-linux
+./radview3d-linux
 ```
+
+## How to use it
+
+### Open a patient folder
+
+1. Launch RadView3D.
+2. Select **Open folder**.
+3. Choose the patient directory, not an individual CT study directory.
+4. Wait for the study-loading screen to finish.
+5. Use the **Study** selector if the patient contains multiple studies.
+
+A typical Monaco patient directory looks like this:
+
+```text
 1~20230127/
-  1~CT1/
-    DCMData/*.CT.DCM
-    contournames
-    T.<z>.WC
-  1~CT2/
-    ...
+├── 1~CT1/
+│   ├── DCMData/*.CT.DCM
+│   ├── contournames
+│   └── T.<z>.WC
+└── 1~CT2/
+    ├── DCMData/*.CT.DCM
+    ├── contournames
+    └── T.<z>.WC
 ```
 
-Images: `DCMData/*.CT.DCM` (preferred). Contours: `contournames` + `T.<z>.WC`. WC is matched to slices by filename Z (tolerance 0.11 mm). Axial mapping uses the Monaco Y-flip: `row = (-z_wc - y0) / dy`.
+RadView3D prefers `1~CT2` when it contains DICOM data, then falls back to another DICOM-containing study.
 
-## Controls
+### Navigate the viewer
 
-- View mode: **All | Axial | Coronal | Sagittal** (keys `1`–`4`)
-- Wheel or sliders on a pane
-- Arrow keys / PageUp / PageDown on the last-clicked pane
-- Structure checkboxes (empty templates are hidden)
-- Window presets: Soft (40/400), Lung (−500/1400), Bone (500/2000)
+| Action | Control |
+| --- | --- |
+| View all panes | `1` or **All** |
+| Axial view | `2` or **Axial** |
+| Coronal view | `3` or **Coronal** |
+| Sagittal view | `4` or **Sagittal** |
+| Change slice | Mouse wheel, slider, or arrow keys |
+| Move 10 slices | `Page Up` / `Page Down` |
+| First or last slice | `Home` / `End` |
+| Show or hide contours | Structure checkboxes |
+| Change CT window | **Soft**, **Lung**, or **Bone** |
+| Close the current folder | **Close folder** |
 
-Axial overlays are WC polylines. Coronal/sagittal overlays are outlines of the label volume (stepped look is expected).
+### Window presets
 
----
+| Preset | Window level | Window width |
+| --- | ---: | ---: |
+| Soft tissue | `40` | `400` |
+| Lung | `-500` | `1400` |
+| Bone | `500` | `2000` |
 
-## Prerequisites
+## Supported data
 
-Install these on the machine you build on.
+- CT images: `DCMData/*.CT.DCM`
+- Structure names: `contournames`
+- Monaco contours: `T.<z>.WC`
+- WC contours are matched to CT slices by Z position with a `0.11 mm` tolerance.
+- The Monaco Y-axis mapping is applied when rendering contours.
 
-### All platforms
+## Build from source
 
-- [Node.js](https://nodejs.org/) 18+ (20 or 24 is fine)
-- [Rust](https://rustup.rs/) stable (`rustup` + `cargo`)
-- npm (comes with Node)
+### Requirements
 
-```bash
-npm install
-```
+- Node.js 18 or newer
+- npm
+- Rust stable with Cargo
+- Windows builds: MSVC C++ build tools and a Windows SDK
+- Linux builds: WebKitGTK, GTK, AppIndicator, `patchelf`, NSIS, and `zenity`
 
-### Ubuntu / Debian (build from source)
-
-```bash
-sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev libgtk-3-dev \
-  libayatana-appindicator3-dev patchelf nsis
-```
-
-`zenity` is used for **Open folder** on Linux (avoids a GTK/WebKit deadlock). It is normally already installed on Ubuntu Desktop:
-
-```bash
-sudo apt install zenity
-```
-
-### Windows (build from source)
-
-- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (already on Windows 10/11)
-- Visual Studio Build Tools with the **Desktop development with C++** workload (MSVC), **or** build the checked-in `release/RadView3D.exe` and skip compiling
-
----
-
-## Run a prebuilt binary
-
-If you have the `release/` folder from this tree:
-
-**Linux**
-
-```bash
-chmod +x release/radview3d-linux
-./release/radview3d-linux
-```
-
-**Windows**
-
-Double-click `release/RadView3D.exe`, or:
-
-```bat
-release\RadView3D.exe
-```
-
-These are standalone apps (frontend is embedded). They do not need Node or a Vite server.
-
----
-
-## Develop (live reload)
-
-From the project root:
+### Development mode
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
-That starts Vite on `http://localhost:1420` and a debug Tauri window. Do **not** pass `--features custom-protocol` here; the window must load the Vite URL.
+On Windows PowerShell, use the `.cmd` wrappers if script execution policy blocks npm:
 
-Linux helper (only needed if system WebKit `-dev` packages are missing and you use a local header extract + `src-tauri/syslib`):
-
-```bash
-chmod +x dev.sh
-./dev.sh
+```powershell
+npm.cmd install
+npm.cmd run tauri dev
 ```
 
-Loader-only check (no GUI):
+### Standalone Windows executable
 
-```bash
+```powershell
+cd D:\Projects\RadView3D
+npm.cmd run build
 cd src-tauri
-cargo run -p radview_core --release --bin radview_verify -- /path/to/1~20230127
+cargo build --release --features custom-protocol
 ```
 
-Expect CT2: 112 slices, 19 structures, ~1006 contour rings. Body contour anterior row should match the CT body (Y-flip).
+The executable is created at:
 
----
+```text
+src-tauri\target\release\radview3d.exe
+```
 
-## Build a release
+### Linux binary
 
-`custom-protocol` embeds `dist/` into the binary so it does not need localhost.
-
-### Linux (on Linux)
+Build on Linux for a native Linux result:
 
 ```bash
 npm install
@@ -133,77 +161,62 @@ cd src-tauri
 cargo build --release --features custom-protocol
 ```
 
-Binary: `src-tauri/target/release/radview3d`
+The binary is created at:
 
-Or:
-
-```bash
-chmod +x run-release.sh
-./run-release.sh
+```text
+src-tauri/target/release/radview3d
 ```
 
-If `npm run tauri build` fails with `ENOSPC` / inotify, use the `cargo build` path above. Raising `fs.inotify.max_user_watches` is optional.
+### macOS package
 
-Installable `.deb` (optional, needs the apt packages above):
+Build on macOS using Apple’s native SDK:
 
 ```bash
-npx tauri build --bundles deb
-```
-
-Output: `src-tauri/target/release/bundle/deb/`
-
-### Windows (on Windows)
-
-```bat
 npm install
-npm run build
-cd src-tauri
-cargo build --release --features custom-protocol
+npx tauri build --bundles app,dmg
 ```
 
-Binary: `src-tauri\target\release\radview3d.exe`
+## FAQ
 
-Installer (NSIS):
+### Does the standalone executable need Node.js?
 
-```bat
-npx tauri build --bundles nsis
-```
+No. Node.js and npm are needed only for development and building. The standalone executable includes the compiled frontend.
 
-Output: `src-tauri\target\release\bundle\nsis\`
+### What folder should I select?
 
-### Windows `.exe` from Linux (optional)
+Select the patient directory, such as `1~20230127`. Do not select only `1~CT1` or `1~CT2` unless that is the workflow you specifically need.
 
-Needs `cargo-xwin`, the `x86_64-pc-windows-msvc` Rust target, `clang`/`lld`/`llvm-rc`, and NSIS. Then:
+### Can I open a different patient after opening one?
 
-```bash
-rustup target add x86_64-pc-windows-msvc
-cargo install --locked cargo-xwin
-npm run build
-cd src-tauri
-cargo xwin build --release --target x86_64-pc-windows-msvc --features custom-protocol
-```
+Yes. Click **Open folder**, choose another patient directory, and wait for the new study to load. Use **Close folder** first if you want to return to an empty viewer.
 
-Binary: `src-tauri/target/x86_64-pc-windows-msvc/release/radview3d.exe`
+### Can I build a Linux binary on Windows?
 
-Do **not** apply the Linux `syslib` / `-fuse-ld=bfd` `RUSTFLAGS` to this target (they are already scoped to `x86_64-unknown-linux-gnu` in `src-tauri/.cargo/config.toml`).
+For reliable native output, build Linux binaries on Linux and macOS packages on macOS. Windows standalone executables should be built on Windows.
 
----
+### Where are release files published?
 
-## Layout
+Open the repository’s [GitHub Releases page](../../releases). Download the asset matching your operating system.
 
-```
-RadView3D/
-  src/                 Vite + TypeScript UI (canvas)
-  src-tauri/           Tauri app + radview_core loader
-    radview_core/       DICOM, contournames, WC, raster, windowing
-    src/lib.rs         IPC: list / load / rewindow / folder pick
-  release/             Optional prebuilt Linux + Windows binaries
-```
+## Open source
 
-IPC: `list_patient_studies`, `load_study_json`, `get_volume_u8`, `get_labels_u8`, `rewindow`, `pick_patient_folder`. After load, the frontend holds `Uint8Array` volumes and never invokes Rust on scroll.
+RadView3D is an open-source project. Contributions, testing feedback, documentation improvements, and code changes are welcome.
 
-## Notes
+## Author
 
-- **Open folder on Ubuntu** uses `zenity`. Cancel the dialog is fine; the app should not freeze.
-- `src-tauri/syslib/` is a local workaround for missing unversioned `.so` stubs. A normal `apt install libwebkit2gtk-4.1-dev` machine does not need it. You can delete the Linux-only `rustflags` in `src-tauri/.cargo/config.toml` if you have those `-dev` packages.
-- Do not commit `node_modules/`, `dist/`, or `src-tauri/target/`.
+Developed by **Nishan Khan**.
+
+<div>
+  <a href="https://github.com/IamNishanKhan" title="GitHub profile">
+    <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" />
+  </a>
+  <a href="https://www.linkedin.com/in/iamnishankhan/" title="LinkedIn profile">
+    <img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
+  </a>
+  <a href="https://www.nishankhan.me/" title="Personal website">
+    <img src="https://img.shields.io/badge/Website-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website" />
+  </a>
+  <a href="mailto:iamnishankhan@gmail.com" title="Email Nishan Khan">
+    <img src="https://img.shields.io/badge/Email-EA4335?style=for-the-badge&logo=gmail&logoColor=white" alt="Email" />
+  </a>
+</div>
