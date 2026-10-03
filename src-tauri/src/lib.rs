@@ -6,61 +6,6 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::ipc::Response;
 use tauri::State;
-use tauri_plugin_dialog::DialogExt;
-
-#[cfg(target_os = "linux")]
-fn pick_folder_zenity() -> Option<String> {
-    let output = std::process::Command::new("zenity")
-        .args([
-            "--file-selection",
-            "--directory",
-            "--title=Open Monaco patient folder",
-        ])
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if path.is_empty() {
-        None
-    } else {
-        Some(path)
-    }
-}
-
-fn pick_folder_rfd(app: tauri::AppHandle) -> Option<String> {
-    let (tx, rx) = std::sync::mpsc::sync_channel(1);
-    app.dialog()
-        .file()
-        .set_title("Open Monaco patient folder")
-        .pick_folder(move |folder| {
-            let path = folder
-                .and_then(|p| p.into_path().ok())
-                .map(|p| p.to_string_lossy().into_owned());
-            let _ = tx.send(path);
-        });
-    rx.recv().ok().flatten()
-}
-
-/// GTK/WebKit deadlocks if rfd's blocking folder picker runs on a worker thread.
-/// On Linux, zenity is a separate process so the app stays responsive.
-/// Elsewhere, use rfd's callback API (does not block the GTK/Win32 event loop).
-#[tauri::command]
-async fn pick_patient_folder(app: tauri::AppHandle) -> Option<String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        #[cfg(target_os = "linux")]
-        {
-            if let Some(path) = pick_folder_zenity() {
-                return Some(path);
-            }
-        }
-        pick_folder_rfd(app)
-    })
-    .await
-    .ok()
-    .flatten()
-}
 
 #[tauri::command]
 fn list_patient_studies(path: String) -> Result<Vec<StudyInfo>, String> {
@@ -145,7 +90,6 @@ pub fn run() {
             wl_ww: Mutex::new((40.0, 400.0)),
         })
         .invoke_handler(tauri::generate_handler![
-            pick_patient_folder,
             list_patient_studies,
             load_study_json,
             get_volume_u8,

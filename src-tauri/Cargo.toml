@@ -4,7 +4,7 @@ members = ["radview_core"]
 
 [package]
 name = "radview3d"
-version = "1.0.0"
+version = "1.0.1"
 description = "RadView3D radiotherapy contour viewer"
 authors = ["BMLab"]
 edition = "2021"

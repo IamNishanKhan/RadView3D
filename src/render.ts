@@ -182,6 +182,10 @@ export class Renderer {
     }
   }
 
+  updateVolume(volume: Uint8Array) {
+    if (this.buffers) this.buffers.volume = volume;
+  }
+
   clear() {
     this.buffers = null;
     this.axImg = null;
@@ -227,17 +231,42 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-export function paneSizeCss(
+export function paneAspectRatio(
   axis: Axis,
-  meta: { rows: number; cols: number; nz: number; spacing: [number, number]; slice_thickness: number },
-) {
+  meta: { rows: number; cols: number; nz: number; spacing: [number, number]; slice_thickness: number; z_positions: number[] },
+): number {
   const [dx, dy] = meta.spacing;
-  const dz = meta.slice_thickness || dx;
+  const zGaps = meta.z_positions
+    .slice(1)
+    .map((position, index) => Math.abs(position - meta.z_positions[index]))
+    .filter((gap) => Number.isFinite(gap) && gap > 0)
+    .sort((a, b) => a - b);
+  const medianGap = zGaps.length ? zGaps[Math.floor(zGaps.length / 2)] : 0;
+  const dz = medianGap || meta.slice_thickness || dx;
   if (axis === "axial") {
-    return { aspect: `${meta.cols * dx} / ${meta.rows * dy}` };
+    return (meta.cols * dx) / (meta.rows * dy);
   }
   if (axis === "coronal") {
-    return { aspect: `${meta.cols * dx} / ${meta.nz * dz}` };
+    return (meta.cols * dx) / (meta.nz * dz);
   }
-  return { aspect: `${meta.rows * dy} / ${meta.nz * dz}` };
+  return (meta.rows * dy) / (meta.nz * dz);
+}
+
+export function fitCanvasToStage(canvas: HTMLCanvasElement, aspect: number): () => void {
+  const stage = canvas.parentElement;
+  if (!stage) return () => {};
+
+  const fit = () => {
+    const { width, height } = stage.getBoundingClientRect();
+    if (!width || !height || !Number.isFinite(aspect) || aspect <= 0) return;
+    const fittedWidth = Math.min(width, height * aspect);
+    const fittedHeight = fittedWidth / aspect;
+    canvas.style.width = `${fittedWidth}px`;
+    canvas.style.height = `${fittedHeight}px`;
+  };
+
+  const observer = new ResizeObserver(fit);
+  observer.observe(stage);
+  fit();
+  return () => observer.disconnect();
 }

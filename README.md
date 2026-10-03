@@ -5,9 +5,12 @@
 
   **A native CT and radiotherapy contour viewer for Elekta/CMS Monaco patient folders.**
 
-  [![Version](https://img.shields.io/badge/Version-1.0.0-5d9bff?style=flat-square)](#)
+  [![Version](https://img.shields.io/badge/Version-1.0.1-5d9bff?style=flat-square)](#)
   [![Rust](https://img.shields.io/badge/Rust-1.99%2B-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
   [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
+  [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+  [![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-Base%20UI-111827?style=flat-square)](https://ui.shadcn.com/)
+  [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
   [![Open source](https://img.shields.io/badge/Open%20source-welcome-2EA44F?style=flat-square)](#open-source)
@@ -17,18 +20,22 @@
 
 ## What is RadView3D?
 
-RadView3D is a focused desktop viewer for CT volumes and structure contours exported from **Elekta/CMS Monaco**. The Rust backend loads and prepares the study once; the TypeScript frontend keeps the volume in memory for responsive orthogonal slice navigation.
+RadView3D is a focused desktop viewer for CT volumes and structure contours exported from **Elekta/CMS Monaco**. The Rust backend loads and prepares the study once; the React/TypeScript frontend keeps the volume in memory for responsive orthogonal slice navigation. The workstation interface is composed from source-owned [shadcn/ui](https://ui.shadcn.com/) components, using its Base UI primitives, Tailwind CSS 4 design tokens, and Lucide icons.
 
 ### Highlights
 
 - Axial, coronal, and sagittal CT views
 - Monaco DICOM CT and `.WC` contour support
 - Structure visibility controls and contour overlays
+- A focused shadcn/ui workstation with a full-height CT study and structure sidebar
+- Accessible shadcn alert dialogs for destructive actions and a dedicated About dialog
 - Soft-tissue, lung, and bone window presets
 - Mouse wheel, sliders, and keyboard slice navigation
-- Dark startup and loading states designed to avoid bright flashes
+- A minimal no-study screen; viewer controls appear only after a patient folder is opened
+- Patient folders open in the synchronized axial, coronal, and sagittal all-view layout
+- A persistent slice slider in every viewport
 - Maximized window startup with standard window controls and smoothly animated dialogs
-- Non-selectable startup text and icons; patient paths remain selectable in the viewer
+- Copy the patient folder path from the sidebar without exposing the full path in the UI
 - Confirmed folder closing and application exit
 - Native Tauri desktop application with standalone binaries
 
@@ -62,10 +69,10 @@ chmod +x radview3d-linux
 ### Open a patient folder
 
 1. Launch RadView3D.
-2. Select **Open folder**.
+2. Select **Open folder** to open the Windows folder picker.
 3. Choose the patient directory, not an individual CT study directory.
-4. Wait for the study-loading screen to finish.
-5. Use the **Study** selector if the patient contains multiple studies.
+4. Wait for the study to load.
+5. Use the **CT1 / CT2** selector in the left sidebar if the patient contains multiple CT studies.
 
 A typical Monaco patient directory looks like this:
 
@@ -95,7 +102,7 @@ RadView3D prefers `1~CT2` when it contains DICOM data, then falls back to anothe
 | Move 10 slices | `Page Up` / `Page Down` |
 | First or last slice | `Home` / `End` |
 | Show or hide contours | Structure checkboxes |
-| Change CT window | **Soft**, **Lung**, or **Bone** |
+| Change CT window | **Soft tissue**, **Lung**, or **Bone** |
 | Close the current folder | **Close folder** |
 
 ### Window presets
@@ -118,9 +125,10 @@ RadView3D prefers `1~CT2` when it contains DICOM data, then falls back to anothe
 
 ### Requirements
 
-- Node.js 18 or newer
+- Node.js 20.19+ (or Node.js 22.12+)
 - npm
 - Rust stable with Cargo
+- shadcn/ui source components are already included under `src/components/ui/`; no UI code is fetched at runtime
 - Windows builds: MSVC C++ build tools and a Windows SDK
 - Linux builds: WebKitGTK, GTK, AppIndicator, `patchelf`, NSIS, and `zenity`
 
@@ -137,6 +145,8 @@ On Windows PowerShell, use the `.cmd` wrappers if script execution policy blocks
 npm.cmd install
 npm.cmd run tauri dev
 ```
+
+The frontend uses Vite + React + TypeScript with Tailwind CSS 4. To add another official shadcn component, run `npx shadcn@latest add <component>` from the project root; the project is configured with the Base UI implementation and Nova visual preset (`components.json`). The CLI is intentionally not a runtime dependency: generated source components are checked in under `src/components/ui/`.
 
 ### One-command build and run
 
