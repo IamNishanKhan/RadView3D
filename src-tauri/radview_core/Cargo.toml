@@ -1,0 +1,17 @@
+[package]
+name = "radview_core"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "radview_verify"
+path = "src/bin/radview_verify.rs"
+
+[dependencies]
+dicom-object = "0.8"
+dicom-pixeldata = { version = "0.8", default-features = false }
+dicom-transfer-syntax-registry = "0.8"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+walkdir = "2"

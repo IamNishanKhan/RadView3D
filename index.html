@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RadView3D</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">RadView3D</div>
+      <button id="btn-open" type="button">Open folder</button>
+      <span id="folder-path" class="path" title="">No patient</span>
+      <label class="field">
+        Study
+        <select id="study-select"></select>
+      </label>
+      <label class="field">
+        Window
+        <select id="window-select">
+          <option value="soft" selected>Soft</option>
+          <option value="lung">Lung</option>
+          <option value="bone">Bone</option>
+        </select>
+      </label>
+      <div class="modes">
+        <button type="button" data-mode-btn="all" class="active">All</button>
+        <button type="button" data-mode-btn="axial">Axial</button>
+        <button type="button" data-mode-btn="coronal">Coronal</button>
+        <button type="button" data-mode-btn="sagittal">Sagittal</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <h2>Structures</h2>
+        <div id="struct-list" class="struct-list"></div>
+      </aside>
+
+      <section class="stage">
+        <div id="view-grid" class="view-grid" data-mode="all">
+          <figure class="pane" data-axis="axial">
+            <figcaption id="label-axial">Axial</figcaption>
+            <div class="canvas-wrap">
+              <canvas id="canvas-axial"></canvas>
+            </div>
+            <input id="slider-axial" type="range" min="0" max="0" value="0" />
+          </figure>
+          <figure class="pane" data-axis="coronal">
+            <figcaption id="label-coronal">Coronal</figcaption>
+            <div class="canvas-wrap">
+              <canvas id="canvas-coronal"></canvas>
+            </div>
+            <input id="slider-coronal" type="range" min="0" max="0" value="0" />
+          </figure>
+          <figure class="pane" data-axis="sagittal">
+            <figcaption id="label-sagittal">Sagittal</figcaption>
+            <div class="canvas-wrap">
+              <canvas id="canvas-sagittal"></canvas>
+            </div>
+            <input id="slider-sagittal" type="range" min="0" max="0" value="0" />
+          </figure>
+        </div>
+      </section>
+    </div>
+
+    <footer id="status" class="status">Open a Monaco patient folder</footer>
+  </body>
+</html>

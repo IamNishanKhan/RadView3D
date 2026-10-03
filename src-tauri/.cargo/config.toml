@@ -1,0 +1,11 @@
+[build]
+target-dir = "target"
+
+# Linux-only: rust-lld cannot find unversioned GTK/WebKit .so stubs.
+# Keep these off the Windows cross target.
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+  "-C", "link-arg=-fuse-ld=bfd",
+  "-C", "link-arg=-L/home/bmlab/Desktop/Viewer/RadView3D/src-tauri/syslib",
+  "-C", "link-arg=-Wl,-rpath,/usr/lib/x86_64-linux-gnu",
+]
