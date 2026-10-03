@@ -8,9 +8,18 @@
     <script type="module" src="/src/main.ts" defer></script>
   </head>
   <body>
+    <div id="loading-overlay" class="loading-overlay" aria-live="polite" aria-busy="true">
+      <div class="loading-card">
+        <img class="loading-logo" src="/src/assets/radview3d-icon.png" alt="RadView3D" />
+        <div class="loading-title">RadView3D</div>
+        <div id="loading-message" class="loading-message">Starting, please wait…</div>
+        <div class="loading-spinner" aria-hidden="true"><span></span></div>
+      </div>
+    </div>
     <header class="topbar">
       <div class="brand">RadView3D</div>
       <button id="btn-open" type="button">Open folder</button>
+      <button id="btn-close" type="button" disabled>Close folder</button>
       <span id="folder-path" class="path" title="">No patient</span>
       <label class="field">
         Study

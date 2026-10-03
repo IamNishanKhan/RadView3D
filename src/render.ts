@@ -182,6 +182,21 @@ export class Renderer {
     }
   }
 
+  clear() {
+    this.buffers = null;
+    this.axImg = null;
+    this.corImg = null;
+    this.sagImg = null;
+    this.colors.clear();
+    this.axialByZ.clear();
+    for (const canvas of [this.axial, this.coronal, this.sagittal]) {
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext("2d");
+      ctx?.clearRect(0, 0, 1, 1);
+    }
+  }
+
   draw(state: ViewState) {
     const b = this.buffers;
     if (!b || !this.axImg || !this.corImg || !this.sagImg) return;

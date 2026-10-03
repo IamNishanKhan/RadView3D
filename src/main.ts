@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { paneSizeCss, Renderer } from "./render";
 import {
   WINDOW_PRESETS,
@@ -21,9 +23,21 @@ let sag = 0;
 let visible = new Set<number>();
 let activeAxis: Axis = "axial";
 let loading = false;
+let closing = false;
+let unlistenClose: (() => void) | null = null;
+let currentPatientPath: string | null = null;
 
 function setStatus(msg: string) {
   $("status").textContent = msg;
+}
+
+function showLoading(message: string) {
+  $("loading-message").textContent = message;
+  $("loading-overlay").classList.remove("hidden");
+}
+
+function hideLoading() {
+  $("loading-overlay").classList.add("hidden");
 }
 
 async function pickFolder() {
@@ -33,18 +47,64 @@ async function pickFolder() {
     await openPatient(path);
   } catch (e) {
     setStatus(String(e));
+    hideLoading();
+  }
+}
+
+async function closeFolder() {
+  if (!currentPatientPath || loading) return;
+  if (!(await confirm("Close the current patient folder? Its loaded study data will be cleared.", {
+    title: "Close folder",
+    kind: "warning",
+    okLabel: "Yes",
+    cancelLabel: "No",
+  }))) {
+    return;
+  }
+  loading = true;
+  showLoading("Closing folder, please wait…");
+  try {
+    await invoke("clear_study");
+    currentPatientPath = null;
+    studies = [];
+    json = null;
+    volume = new Uint8Array();
+    labels = new Uint8Array();
+    visible.clear();
+    renderer?.clear();
+    $("folder-path").textContent = "No patient";
+    $("folder-path").title = "";
+    $("struct-list").innerHTML = "";
+    ($("study-select") as HTMLSelectElement).innerHTML = "";
+    for (const axis of ["axial", "coronal", "sagittal"] as const) {
+      const slider = $(`slider-${axis}`) as HTMLInputElement;
+      slider.max = "0";
+      slider.value = "0";
+    }
+    ($("btn-close") as HTMLButtonElement).disabled = true;
+    setStatus("Open a Monaco patient folder");
+  } catch (e) {
+    setStatus(String(e));
+  } finally {
+    loading = false;
+    hideLoading();
   }
 }
 
 async function openPatient(path: string) {
+  showLoading("Loading study, please wait…");
   setStatus("Scanning studies…");
   try {
     studies = await invoke<StudyInfo[]>("list_patient_studies", { path });
   } catch (e) {
     setStatus(String(e));
+    hideLoading();
     return;
   }
+  currentPatientPath = path;
+  ($("btn-close") as HTMLButtonElement).disabled = false;
   $("folder-path").textContent = path;
+  $("folder-path").title = path;
   const sel = $("study-select") as HTMLSelectElement;
   sel.innerHTML = "";
   for (const s of studies) {
@@ -63,6 +123,7 @@ async function openPatient(path: string) {
     await loadSelectedStudy();
   } else {
     setStatus("No studies found");
+    hideLoading();
   }
 }
 
@@ -71,6 +132,7 @@ async function loadSelectedStudy() {
   const studyPath = sel.value;
   if (!studyPath || loading) return;
   loading = true;
+  showLoading("Loading study, please wait…");
   const preset = WINDOW_PRESETS[($("window-select") as HTMLSelectElement).value] ?? WINDOW_PRESETS.soft;
   setStatus("Loading study (one-time)…");
   try {
@@ -106,6 +168,7 @@ async function loadSelectedStudy() {
     setStatus(String(e));
   } finally {
     loading = false;
+    hideLoading();
   }
 }
 
@@ -240,7 +303,34 @@ function axisFromTarget(t: EventTarget | null): Axis | null {
   return (pane?.dataset.axis as Axis) ?? null;
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
+  const appWindow = getCurrentWindow();
+  unlistenClose = await appWindow.onCloseRequested(async (event) => {
+    if (closing) return;
+    event.preventDefault();
+
+    if (!(await confirm("Exit RadView3D now?", {
+      title: "Close application",
+      kind: "warning",
+      okLabel: "Yes",
+      cancelLabel: "No",
+    }))) {
+      return;
+    }
+
+    closing = true;
+    showLoading("Closing, please wait…");
+    setStatus("Closing, please wait…");
+    await new Promise((resolve) => setTimeout(resolve, 180));
+
+    // Remove this interceptor before exiting so the close event cannot loop.
+    unlistenClose?.();
+    unlistenClose = null;
+    // Exit natively instead of calling Window.close() from inside its own
+    // close-request callback, which can leave the WebView waiting forever.
+    void invoke("exit_app");
+  });
+
   renderer = new Renderer(
     $("canvas-axial") as HTMLCanvasElement,
     $("canvas-coronal") as HTMLCanvasElement,
@@ -248,6 +338,7 @@ window.addEventListener("DOMContentLoaded", () => {
   );
 
   $("btn-open").addEventListener("click", () => void pickFolder());
+  $("btn-close").addEventListener("click", () => void closeFolder());
   $("study-select").addEventListener("change", () => void loadSelectedStudy());
   $("window-select").addEventListener("change", () => void changeWindow());
 
@@ -305,5 +396,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   const defaultPath = "/home/bmlab/Desktop/Viewer/Monaco/1~20230127";
+  showLoading("Starting, please wait…");
   void openPatient(defaultPath);
 });

@@ -120,6 +120,19 @@ fn rewindow(state: State<AppState>, wl: f32, ww: f32) -> Result<Response, String
     Ok(Response::new(volume_u8))
 }
 
+#[tauri::command]
+fn clear_study(state: State<AppState>) {
+    *state.hu.lock().unwrap() = None;
+    *state.labels.lock().unwrap() = None;
+    *state.volume_u8.lock().unwrap() = None;
+    *state.wl_ww.lock().unwrap() = (40.0, 400.0);
+}
+
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -137,7 +150,9 @@ pub fn run() {
             load_study_json,
             get_volume_u8,
             get_labels_u8,
-            rewindow
+            rewindow,
+            clear_study,
+            exit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
