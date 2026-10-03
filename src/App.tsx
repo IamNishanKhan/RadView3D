@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open as openNativeFolder } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import radviewIcon from "./assets/radview3d-icon.png";
 import {
@@ -122,11 +121,7 @@ function App() {
 
   const openPatient = useCallback(async () => {
     try {
-      const path = await openNativeFolder({
-        title: "Open Monaco patient folder",
-        directory: true,
-        multiple: false,
-      });
+      const path = await invoke<string | null>("pick_patient_folder");
       if (!path) return;
       setLoading(true);
       setStatus("Scanning patient folder…");

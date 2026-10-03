@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::ipc::Response;
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
 fn list_patient_studies(path: String) -> Result<Vec<StudyInfo>, String> {
@@ -73,6 +74,28 @@ fn clear_study(state: State<AppState>) {
     *state.wl_ww.lock().unwrap() = (40.0, 400.0);
 }
 
+fn pick_folder_rfd(app: tauri::AppHandle) -> Option<String> {
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    app.dialog()
+        .file()
+        .set_title("Open Monaco patient folder")
+        .pick_folder(move |folder| {
+            let path = folder
+                .and_then(|p| p.into_path().ok())
+                .map(|p| p.to_string_lossy().into_owned());
+            let _ = tx.send(path);
+        });
+    rx.recv().ok().flatten()
+}
+
+#[tauri::command]
+async fn pick_patient_folder(app: tauri::AppHandle) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || pick_folder_rfd(app))
+        .await
+        .ok()
+        .flatten()
+}
+
 #[tauri::command]
 fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
@@ -80,6 +103,13 @@ fn exit_app(app: tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        // WebView2 reads this before its controller's initial blank frame.
+        // Keep the environment mutation before Tauri/WebView2 starts any threads.
+        std::env::set_var("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "0xFF0B0E12");
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -90,6 +120,7 @@ pub fn run() {
             wl_ww: Mutex::new((40.0, 400.0)),
         })
         .invoke_handler(tauri::generate_handler![
+            pick_patient_folder,
             list_patient_studies,
             load_study_json,
             get_volume_u8,
