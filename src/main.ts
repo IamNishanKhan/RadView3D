@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { confirm } from "@tauri-apps/plugin-dialog";
 import { paneSizeCss, Renderer } from "./render";
 import {
   WINDOW_PRESETS,
@@ -26,6 +25,9 @@ let loading = false;
 let closing = false;
 let unlistenClose: (() => void) | null = null;
 let currentPatientPath: string | null = null;
+let confirmationResolver: ((confirmed: boolean) => void) | null = null;
+let confirmationReturnFocus: HTMLElement | null = null;
+let aboutReturnFocus: HTMLElement | null = null;
 
 function setStatus(msg: string) {
   $("status").textContent = msg;
@@ -40,6 +42,56 @@ function hideLoading() {
   $("loading-overlay").classList.add("hidden");
 }
 
+function setFolderUi(open: boolean) {
+  document.body.classList.toggle("has-folder", open);
+  document.body.classList.toggle("no-folder", !open);
+  $("folder-controls").hidden = !open;
+  const closeButton = $("btn-close") as HTMLButtonElement;
+  closeButton.disabled = !open;
+  closeButton.title = open ? "Close patient folder" : "No patient folder is open";
+}
+
+function setAboutOpen(open: boolean) {
+  const dialog = $("about-dialog");
+  if (open) aboutReturnFocus = document.activeElement as HTMLElement | null;
+  dialog.classList.toggle("open", open);
+  dialog.setAttribute("aria-hidden", String(!open));
+  if (open) {
+    ($("btn-about-close") as HTMLButtonElement).focus({ preventScroll: true });
+  } else {
+    aboutReturnFocus?.focus({ preventScroll: true });
+    aboutReturnFocus = null;
+  }
+}
+
+function requestConfirmation(
+  title: string,
+  message: string,
+  confirmLabel: string,
+): Promise<boolean> {
+  if (confirmationResolver) return Promise.resolve(false);
+  $("confirm-title").textContent = title;
+  $("confirm-message").textContent = message;
+  ($("btn-confirm-yes") as HTMLButtonElement).textContent = confirmLabel;
+  confirmationReturnFocus = document.activeElement as HTMLElement | null;
+  return new Promise((resolve) => {
+    confirmationResolver = resolve;
+    $("confirm-dialog").classList.add("open");
+    $("confirm-dialog").setAttribute("aria-hidden", "false");
+    ($("btn-confirm-no") as HTMLButtonElement).focus({ preventScroll: true });
+  });
+}
+
+function finishConfirmation(confirmed: boolean) {
+  const resolve = confirmationResolver;
+  confirmationResolver = null;
+  $("confirm-dialog").classList.remove("open");
+  $("confirm-dialog").setAttribute("aria-hidden", "true");
+  resolve?.(confirmed);
+  confirmationReturnFocus?.focus({ preventScroll: true });
+  confirmationReturnFocus = null;
+}
+
 async function pickFolder() {
   try {
     const path = await invoke<string | null>("pick_patient_folder");
@@ -47,18 +99,18 @@ async function pickFolder() {
     await openPatient(path);
   } catch (e) {
     setStatus(String(e));
+    setFolderUi(false);
     hideLoading();
   }
 }
 
 async function closeFolder() {
   if (!currentPatientPath || loading) return;
-  if (!(await confirm("Close the current patient folder? Its loaded study data will be cleared.", {
-    title: "Close folder",
-    kind: "warning",
-    okLabel: "Yes",
-    cancelLabel: "No",
-  }))) {
+  if (!(await requestConfirmation(
+    "Close patient folder",
+    "The current study will be closed and its data cleared from the viewer.",
+    "Close folder",
+  ))) {
     return;
   }
   loading = true;
@@ -72,6 +124,7 @@ async function closeFolder() {
     labels = new Uint8Array();
     visible.clear();
     renderer?.clear();
+    setFolderUi(false);
     $("folder-path").textContent = "No patient";
     $("folder-path").title = "";
     $("struct-list").innerHTML = "";
@@ -92,17 +145,18 @@ async function closeFolder() {
 }
 
 async function openPatient(path: string) {
+  setFolderUi(false);
   showLoading("Loading study, please wait…");
   setStatus("Scanning studies…");
   try {
     studies = await invoke<StudyInfo[]>("list_patient_studies", { path });
   } catch (e) {
     setStatus(String(e));
+    setFolderUi(false);
     hideLoading();
     return;
   }
   currentPatientPath = path;
-  ($("btn-close") as HTMLButtonElement).disabled = false;
   $("folder-path").textContent = path;
   $("folder-path").title = path;
   const sel = $("study-select") as HTMLSelectElement;
@@ -135,6 +189,7 @@ async function loadSelectedStudy() {
   showLoading("Loading study, please wait…");
   const preset = WINDOW_PRESETS[($("window-select") as HTMLSelectElement).value] ?? WINDOW_PRESETS.soft;
   setStatus("Loading study (one-time)…");
+  let studyLoaded = false;
   try {
     const loadedJson = await invoke<StudyJson>("load_study_json", {
       studyPath,
@@ -164,10 +219,12 @@ async function loadSelectedStudy() {
     setStatus(
       `${loadedJson.meta.patient_id} / ${loadedJson.meta.study_name}   ${nz} slices   ${loadedJson.structures.length} structures   ${rings} rings`,
     );
+    studyLoaded = true;
   } catch (e) {
     setStatus(String(e));
   } finally {
     loading = false;
+    if (studyLoaded) setFolderUi(true);
     hideLoading();
   }
 }
@@ -304,17 +361,17 @@ function axisFromTarget(t: EventTarget | null): Axis | null {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
+  setFolderUi(false);
   const appWindow = getCurrentWindow();
   unlistenClose = await appWindow.onCloseRequested(async (event) => {
     if (closing) return;
     event.preventDefault();
 
-    if (!(await confirm("Exit RadView3D now?", {
-      title: "Close application",
-      kind: "warning",
-      okLabel: "Yes",
-      cancelLabel: "No",
-    }))) {
+    if (!(await requestConfirmation(
+      "Exit RadView3D",
+      "The application will close. Any study currently open will be cleared from the viewer.",
+      "Exit application",
+    ))) {
       return;
     }
 
@@ -338,7 +395,24 @@ window.addEventListener("DOMContentLoaded", async () => {
   );
 
   $("btn-open").addEventListener("click", () => void pickFolder());
+  $("btn-empty-open").addEventListener("click", () => void pickFolder());
   $("btn-close").addEventListener("click", () => void closeFolder());
+  $("btn-info").addEventListener("click", () => setAboutOpen(true));
+  $("btn-about-close").addEventListener("click", () => setAboutOpen(false));
+  $("btn-confirm-yes").addEventListener("click", () => finishConfirmation(true));
+  $("btn-confirm-no").addEventListener("click", () => finishConfirmation(false));
+  $("confirm-dialog").addEventListener("click", (event) => {
+    if (event.target === $("confirm-dialog")) finishConfirmation(false);
+  });
+  $("about-dialog").addEventListener("click", (event) => {
+    if (event.target === $("about-dialog")) setAboutOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setAboutOpen(false);
+      finishConfirmation(false);
+    }
+  });
   $("study-select").addEventListener("change", () => void loadSelectedStudy());
   $("window-select").addEventListener("change", () => void changeWindow());
 
@@ -395,7 +469,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "4") setViewMode("sagittal");
   });
 
-  const defaultPath = "/home/bmlab/Desktop/Viewer/Monaco/1~20230127";
-  showLoading("Starting, please wait…");
-  void openPatient(defaultPath);
+  setStatus("Ready to open a patient folder");
+  hideLoading();
 });

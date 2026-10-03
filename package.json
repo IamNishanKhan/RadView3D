@@ -1,14 +1,16 @@
 {
   "name": "radview3d",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:standalone": "npm run build && cargo build --manifest-path src-tauri/Cargo.toml --release --features custom-protocol",
+    "standalone": "npm run build:standalone && npm run start",
     "preview": "vite preview",
     "tauri": "tauri",
-    "start": "src-tauri/target/release/radview3d"
+    "start": "node scripts/run-release.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

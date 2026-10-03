@@ -5,6 +5,7 @@
 
   **A native CT and radiotherapy contour viewer for Elekta/CMS Monaco patient folders.**
 
+  [![Version](https://img.shields.io/badge/Version-1.0.0-5d9bff?style=flat-square)](#)
   [![Rust](https://img.shields.io/badge/Rust-1.99%2B-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
   [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -26,6 +27,8 @@ RadView3D is a focused desktop viewer for CT volumes and structure contours expo
 - Soft-tissue, lung, and bone window presets
 - Mouse wheel, sliders, and keyboard slice navigation
 - Dark startup and loading states designed to avoid bright flashes
+- Maximized window startup with standard window controls and smoothly animated dialogs
+- Non-selectable startup text and icons; patient paths remain selectable in the viewer
 - Confirmed folder closing and application exit
 - Native Tauri desktop application with standalone binaries
 
@@ -39,7 +42,7 @@ Prebuilt applications are published on the repository’s [GitHub Releases page]
 
 1. Open [GitHub Releases](../../releases).
 2. Download the Windows standalone `.exe` asset.
-3. Run `RadView3D.exe` directly.
+3. Run `RadView3D.exe` directly. RadView3D opens maximized, with the standard minimize, maximize/restore, and close buttons visible.
 
 The standalone executable does not require Node.js, npm, Vite, or a development server. Windows 10/11 should have the WebView2 Runtime available; if Windows asks for it, install the [Microsoft WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
 
@@ -134,6 +137,16 @@ On Windows PowerShell, use the `.cmd` wrappers if script execution policy blocks
 npm.cmd install
 npm.cmd run tauri dev
 ```
+
+### One-command build and run
+
+After installing the prerequisites, build the standalone native application and launch it with one command:
+
+```powershell
+npm.cmd run standalone
+```
+
+This runs the frontend build, compiles the Rust release binary with the embedded frontend, and starts the resulting application. Use `npm.cmd run build:standalone` when you want to build without launching it.
 
 ### Standalone Windows executable
 

@@ -17,28 +17,48 @@
       </div>
     </div>
     <header class="topbar">
-      <div class="brand">RadView3D</div>
-      <button id="btn-open" type="button">Open folder</button>
-      <button id="btn-close" type="button" disabled>Close folder</button>
-      <span id="folder-path" class="path" title="">No patient</span>
-      <label class="field">
-        Study
-        <select id="study-select"></select>
-      </label>
-      <label class="field">
-        Window
-        <select id="window-select">
-          <option value="soft" selected>Soft</option>
-          <option value="lung">Lung</option>
-          <option value="bone">Bone</option>
-        </select>
-      </label>
-      <div class="modes">
-        <button type="button" data-mode-btn="all" class="active">All</button>
-        <button type="button" data-mode-btn="axial">Axial</button>
-        <button type="button" data-mode-btn="coronal">Coronal</button>
-        <button type="button" data-mode-btn="sagittal">Sagittal</button>
+      <div class="brand-block">
+        <img class="brand-icon" src="/src/assets/radview3d-icon.png" alt="" />
+        <div>
+          <div class="brand">RadView3D</div>
+          <div class="brand-subtitle">Monaco CT &amp; contour viewer</div>
+        </div>
       </div>
+
+      <div class="toolbar-actions" aria-label="Folder actions">
+        <button id="btn-open" class="icon-button" type="button" title="Open patient folder" aria-label="Open patient folder">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v9.25A2.25 2.25 0 0 1 18.25 20H5.75a2.25 2.25 0 0 1-2.25-2.25V6.5Z"/><path d="M3.5 9h17"/></svg>
+        </button>
+        <button id="btn-close" class="icon-button" type="button" disabled title="No patient folder is open" aria-label="Close patient folder">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v9.25A2.25 2.25 0 0 1 18.25 20H5.75a2.25 2.25 0 0 1-2.25-2.25V6.5Z"/><path d="M8 14h8"/></svg>
+        </button>
+      </div>
+
+      <div id="folder-controls" class="folder-controls" hidden>
+        <span id="folder-path" class="path" title=""></span>
+        <label class="field">
+          <span>Study</span>
+          <select id="study-select"></select>
+        </label>
+        <label class="field">
+          <span>Window</span>
+          <select id="window-select">
+            <option value="soft" selected>Soft</option>
+            <option value="lung">Lung</option>
+            <option value="bone">Bone</option>
+          </select>
+        </label>
+        <div class="modes" aria-label="View mode">
+          <button type="button" data-mode-btn="all" class="active">All</button>
+          <button type="button" data-mode-btn="axial">Axial</button>
+          <button type="button" data-mode-btn="coronal">Coronal</button>
+          <button type="button" data-mode-btn="sagittal">Sagittal</button>
+        </div>
+      </div>
+
+      <button id="btn-info" class="icon-button info-button" type="button" title="About RadView3D" aria-label="About RadView3D" aria-haspopup="dialog" aria-controls="about-dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 10.8v5.2M12 7.8h.01"/></svg>
+      </button>
     </header>
 
     <div class="workspace">
@@ -48,6 +68,13 @@
       </aside>
 
       <section class="stage">
+        <div id="empty-state" class="empty-state">
+          <img src="/src/assets/radview3d-icon.png" alt="" />
+          <div class="empty-kicker">Ready for review</div>
+          <h1>Open a Monaco patient folder</h1>
+          <p>Load CT images and contours to begin exploring the study.</p>
+          <button id="btn-empty-open" class="primary-button" type="button">Open patient folder</button>
+        </div>
         <div id="view-grid" class="view-grid" data-mode="all">
           <figure class="pane" data-axis="axial">
             <figcaption id="label-axial">Axial</figcaption>
@@ -75,5 +102,44 @@
     </div>
 
     <footer id="status" class="status">Open a Monaco patient folder</footer>
+
+    <div id="about-dialog" class="about-backdrop" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="about-title">
+      <section class="about-card">
+        <button id="btn-about-close" class="about-close" type="button" title="Close About" aria-label="Close About">×</button>
+        <img class="about-icon" src="/src/assets/radview3d-icon.png" alt="RadView3D icon" />
+        <div class="about-kicker">About the application</div>
+        <h2 id="about-title">RadView3D</h2>
+        <div class="about-version">Version 1.0.0</div>
+        <p class="about-description">A native CT and radiotherapy contour viewer for Elekta/CMS Monaco patient folders.</p>
+        <div class="about-divider"></div>
+        <div class="about-developer-label">Developed by</div>
+        <div class="about-developer">Nishan Khan</div>
+        <div class="about-links" aria-label="Developer links">
+          <a class="about-icon-link" href="https://github.com/IamNishanKhan" target="_blank" rel="noreferrer" title="Open GitHub profile" aria-label="Open GitHub profile">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5a8.5 8.5 0 0 0-2.69 16.56c.43.08.59-.19.59-.42v-1.49c-2.4.52-2.91-1.02-2.91-1.02-.39-.99-.96-1.25-.96-1.25-.78-.53.06-.52.06-.52.86.06 1.31.88 1.31.88.77 1.31 2.02.93 2.51.71.08-.55.3-.93.55-1.14-1.92-.22-3.94-.96-3.94-4.28 0-.95.34-1.72.88-2.32-.09-.22-.38-1.1.08-2.29 0 0 .72-.23 2.35.89a8.18 8.18 0 0 1 4.28 0c1.63-1.12 2.35-.89 2.35-.89.46 1.19.17 2.07.08 2.29.55.6.88 1.37.88 2.32 0 3.33-2.03 4.06-3.96 4.27.31.27.58.79.58 1.59v2.36c0 .23.16.5.59.42A8.5 8.5 0 0 0 12 3.5Z"/></svg>
+          </a>
+          <a class="about-icon-link" href="https://www.nishankhan.me/" target="_blank" rel="noreferrer" title="Open personal website" aria-label="Open personal website">
+            <svg class="globe-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3c2.2 2.4 3.3 5.4 3.3 9s-1.1 6.6-3.3 9c-2.2-2.4-3.3-5.4-3.3-9S9.8 5.4 12 3Z"/></svg>
+          </a>
+        </div>
+      </section>
+    </div>
+
+    <div id="confirm-dialog" class="confirm-backdrop" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <section class="confirm-card">
+        <div class="confirm-heading">
+          <div class="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5 20 7v5.1c0 4.2-2.6 7.2-8 8.4-5.4-1.2-8-4.2-8-8.4V7l8-3.5Z"/><path d="M12 8.2v4.5M12 15.8h.01"/></svg></div>
+          <div>
+            <div class="confirm-kicker">Action required</div>
+            <h2 id="confirm-title">Confirm action</h2>
+          </div>
+        </div>
+        <p id="confirm-message"></p>
+        <div class="confirm-actions">
+          <button id="btn-confirm-no" class="secondary-button" type="button">No, keep working</button>
+          <button id="btn-confirm-yes" class="primary-button" type="button">Yes, continue</button>
+        </div>
+      </section>
+    </div>
   </body>
 </html>
