@@ -1,11 +1,143 @@
 mod state;
 
 use radview_core::{list_studies, load_study, window::window_hu, LoadedStudy, StudyInfo, StudyJson};
+use serde::{Deserialize, Serialize};
 use state::AppState;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Response;
-use tauri::State;
+use tauri::{Manager, State};
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PatientLibraryEntry {
+    id: String,
+    path: String,
+}
+
+fn patient_library_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let directory = app.path().app_data_dir().map_err(|error| error.to_string())?;
+    std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(directory.join("patient-library.json"))
+}
+
+fn read_patient_library(app: &tauri::AppHandle) -> Result<Vec<PatientLibraryEntry>, String> {
+    let path = patient_library_file(app)?;
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).map_err(|error| error.to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn write_patient_library(
+    app: &tauri::AppHandle,
+    patients: &[PatientLibraryEntry],
+) -> Result<(), String> {
+    let path = patient_library_file(app)?;
+    let contents = serde_json::to_vec_pretty(patients).map_err(|error| error.to_string())?;
+    std::fs::write(path, contents).map_err(|error| error.to_string())
+}
+
+fn looks_like_patient_folder(path: &std::path::Path) -> bool {
+    if path.join("DCMData").is_dir() || path.join("contournames").is_file() {
+        return true;
+    }
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return false;
+    };
+    entries.filter_map(|entry| entry.ok()).any(|entry| {
+        if !entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false) {
+            return false;
+        }
+        let study_path = entry.path();
+        study_path.join("DCMData").is_dir() || study_path.join("contournames").is_file()
+    })
+}
+
+fn add_patient_folders(
+    app: tauri::AppHandle,
+    selected_path: String,
+) -> Result<Vec<PatientLibraryEntry>, String> {
+    let root = PathBuf::from(selected_path);
+    if !root.is_dir() {
+        return Err(format!("Not a directory: {}", root.display()));
+    }
+
+    let mut candidates = Vec::new();
+    if looks_like_patient_folder(&root) {
+        let id = root
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "Patient".into());
+        candidates.push(PatientLibraryEntry {
+            id,
+            path: root.to_string_lossy().into_owned(),
+        });
+    } else {
+        for entry in std::fs::read_dir(&root).map_err(|error| error.to_string())? {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(_) => continue,
+            };
+            if !entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            let patient_path = entry.path();
+            let id = entry.file_name().to_string_lossy().into_owned();
+            if id.starts_with('.') || id.eq_ignore_ascii_case("plan") {
+                continue;
+            }
+            candidates.push(PatientLibraryEntry {
+                id,
+                path: patient_path.to_string_lossy().into_owned(),
+            });
+        }
+    }
+
+    if candidates.is_empty() {
+        return Err("No patient folders were found in the selected directory.".into());
+    }
+
+    let mut patients = read_patient_library(&app)?;
+    for candidate in candidates {
+        if !patients
+            .iter()
+            .any(|patient| patient.path.eq_ignore_ascii_case(&candidate.path))
+        {
+            patients.push(candidate);
+        }
+    }
+    patients.sort_by(|left, right| left.id.cmp(&right.id).then(left.path.cmp(&right.path)));
+    write_patient_library(&app, &patients)?;
+    Ok(patients)
+}
+
+#[tauri::command]
+fn load_patient_library(app: tauri::AppHandle) -> Result<Vec<PatientLibraryEntry>, String> {
+    read_patient_library(&app)
+}
+
+#[tauri::command]
+async fn add_patient_folder_to_library(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<Vec<PatientLibraryEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || add_patient_folders(app, path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+fn remove_patient_from_library(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<Vec<PatientLibraryEntry>, String> {
+    let mut patients = read_patient_library(&app)?;
+    patients.retain(|patient| !patient.path.eq_ignore_ascii_case(&path));
+    write_patient_library(&app, &patients)?;
+    Ok(patients)
+}
 
 #[tauri::command]
 fn list_patient_studies(path: String) -> Result<Vec<StudyInfo>, String> {
@@ -92,6 +224,9 @@ pub fn run() {
             volume_u8: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
+            load_patient_library,
+            add_patient_folder_to_library,
+            remove_patient_from_library,
             list_patient_studies,
             load_study_json,
             take_initial_volume_u8,

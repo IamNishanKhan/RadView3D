@@ -109,25 +109,6 @@ function drawPolylines(
   }
 }
 
-function drawCrosshair(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  x: number,
-  y: number,
-) {
-  ctx.save();
-  ctx.strokeStyle = "rgba(255,220,80,0.7)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, y + 0.5);
-  ctx.lineTo(w, y + 0.5);
-  ctx.moveTo(x + 0.5, 0);
-  ctx.lineTo(x + 0.5, h);
-  ctx.stroke();
-  ctx.restore();
-}
-
 export class Renderer {
   private axial: HTMLCanvasElement;
   private coronal: HTMLCanvasElement;
@@ -217,7 +198,6 @@ export class Renderer {
     fillGrayImageData(extractAxial(b.volume, ax, rows, cols), cols, rows, this.axImg);
     this.axCtx.putImageData(this.axImg, 0, 0);
     drawPolylines(this.axCtx, this.axialByZ.get(ax) ?? [], state.visible, this.colors);
-    drawCrosshair(this.axCtx, cols, rows, sag, cor);
 
     extractCoronal(b.volume, cor, nz, rows, cols, this.corSlice);
     fillGrayImageData(this.corSlice, cols, nz, this.corImg);
@@ -226,7 +206,6 @@ export class Renderer {
       paintOutline(this.corImg, this.corLabels, cols, nz, state.visible, this.colors);
     }
     this.corCtx.putImageData(this.corImg, 0, 0);
-    drawCrosshair(this.corCtx, cols, nz, sag, ax);
 
     extractSagittal(b.volume, sag, nz, rows, cols, this.sagSlice);
     fillGrayImageData(this.sagSlice, rows, nz, this.sagImg);
@@ -235,7 +214,6 @@ export class Renderer {
       paintOutline(this.sagImg, this.sagLabels, rows, nz, state.visible, this.colors);
     }
     this.sagCtx.putImageData(this.sagImg, 0, 0);
-    drawCrosshair(this.sagCtx, rows, nz, cor, ax);
   }
 }
 
@@ -264,8 +242,8 @@ export function paneAspectRatio(
   return (meta.rows * dy) / (meta.nz * dz);
 }
 
-export function fitCanvasToStage(canvas: HTMLCanvasElement, aspect: number): () => void {
-  const stage = canvas.parentElement;
+export function fitImageFrameToStage(frame: HTMLElement, aspect: number): () => void {
+  const stage = frame.parentElement;
   if (!stage) return () => {};
 
   const fit = () => {
@@ -273,8 +251,8 @@ export function fitCanvasToStage(canvas: HTMLCanvasElement, aspect: number): () 
     if (!width || !height || !Number.isFinite(aspect) || aspect <= 0) return;
     const fittedWidth = Math.min(width, height * aspect);
     const fittedHeight = fittedWidth / aspect;
-    canvas.style.width = `${fittedWidth}px`;
-    canvas.style.height = `${fittedHeight}px`;
+    frame.style.width = `${fittedWidth}px`;
+    frame.style.height = `${fittedHeight}px`;
   };
 
   const observer = new ResizeObserver(fit);

@@ -5,6 +5,11 @@ export interface StudyInfo {
   has_contournames: boolean;
 }
 
+export interface PatientLibraryEntry {
+  id: string;
+  path: string;
+}
+
 export interface StudyMeta {
   patient_id: string;
   study_name: string;

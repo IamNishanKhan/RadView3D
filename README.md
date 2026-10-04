@@ -32,6 +32,7 @@ RadView3D is a focused desktop viewer for CT volumes and structure contours expo
 - Soft-tissue, lung, and bone window presets
 - Mouse wheel, sliders, and keyboard slice navigation
 - A minimal no-study screen; viewer controls appear only after a patient folder is opened
+- A persistent patient library that indexes folder references without loading CT volumes
 - Patient folders open in the synchronized axial, coronal, and sagittal all-view layout
 - A persistent slice slider in every viewport
 - Maximized window startup with standard window controls and smoothly animated dialogs
@@ -89,6 +90,16 @@ A typical Monaco patient directory looks like this:
 ```
 
 RadView3D prefers `1~CT2` when it contains DICOM data, then falls back to another DICOM-containing study.
+
+### Patient library
+
+1. Select **Library** beside **Open folder** to show the patient list in the main workspace.
+2. Select **Add patients** and choose either one patient folder or a parent folder whose immediate subfolders are patient folders. Additional imports merge into the same library.
+3. Patient IDs are taken from the patient folder names. Indexing records only those names and paths; CT images and contours are read only after you select an ID.
+4. Select anywhere on a patient row to open it in the viewer. Closing a library-opened patient returns to the list.
+5. Select the row’s delete icon to remove an entry from the library. The patient folder and its files remain untouched on disk.
+
+The library is stored as a small JSON index in RadView3D's per-user application data folder. It stores patient IDs and paths; it does not copy or modify patient data.
 
 ### Navigate the viewer
 
