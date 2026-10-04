@@ -186,7 +186,7 @@
 .empty-stage { display: flex; flex: 1; align-items: center; justify-content: center; gap: 9px; min-height: 0; padding: 24px; color: #a1aab3; font-size: 12px; }
 .empty-spinner { width: 15px; height: 15px; color: var(--primary); }
 .confirm-content { width: min(420px, calc(100vw - 32px)); max-width: 420px; gap: 18px; padding: 20px; border: 1px solid #343d46; background: #11171d; box-shadow: 0 18px 60px #0009; }
-.confirm-content, .about-content { position: fixed; inset: 0; height: fit-content; max-height: calc(100dvh - 32px); margin: auto; overflow-y: auto; transform: none !important; }
+.confirm-content, .about-content { position: fixed; inset: auto; top: 50%; left: 50%; height: auto; max-height: calc(100dvh - 32px); margin: 0; overflow-y: auto; transform: translate(-50%, -50%) !important; }
 .confirm-content [data-slot=alert-dialog-header] { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; text-align: left; }
 .confirm-content [data-slot=alert-dialog-title] { color: #e8edf1; font-size: 15px; font-weight: 560; }
 .confirm-content [data-slot=alert-dialog-description] { color: #a5afb8; font-size: 12px; line-height: 1.55; }
