@@ -25,15 +25,16 @@ pub fn list_studies(patient_dir: &Path) -> Result<Vec<StudyInfo>> {
         }
 
         let dcm = path.join("DCMData");
-        let has_dicom = dcm.is_dir()
-            && fs::read_dir(&dcm)
-                .map(|rd| {
-                    rd.filter_map(|e| e.ok()).any(|e| {
-                        let n = e.file_name().to_string_lossy().to_ascii_lowercase();
-                        n.ends_with(".dcm")
-                    })
+        let has_dicom = fs::read_dir(&dcm)
+            .map(|rd| {
+                rd.filter_map(|e| e.ok()).any(|e| {
+                    let name = e.file_name();
+                    name.to_str()
+                        .and_then(|name| name.rsplit_once('.').map(|(_, ext)| ext))
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("dcm"))
                 })
-                .unwrap_or(false);
+            })
+            .unwrap_or(false);
         let has_contournames = path.join("contournames").is_file();
         if has_dicom || has_contournames {
             studies.push(StudyInfo {

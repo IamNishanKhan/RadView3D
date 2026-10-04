@@ -92,6 +92,11 @@ pub fn load_study(study_path: &Path, wl: f32, ww: f32) -> Result<(LoadedStudy, V
         Z_TOLERANCE_MM,
     );
 
+    let mut contour_counts = [0usize; 256];
+    for contour in &contours {
+        contour_counts[contour.struct_id as usize] += 1;
+    }
+
     let mut structures: Vec<Structure> = structures_map
         .into_iter()
         .map(|(id, s)| Structure {
@@ -100,7 +105,7 @@ pub fn load_study(study_path: &Path, wl: f32, ww: f32) -> Result<(LoadedStudy, V
             rgb: s.rgb,
             opacity: s.opacity,
             type_id: s.type_id,
-            contour_count: contours.iter().filter(|c| c.struct_id == id).count(),
+            contour_count: contour_counts[id as usize],
         })
         .collect();
     structures.sort_by_key(|s| s.id);
@@ -115,14 +120,13 @@ pub fn load_study(study_path: &Path, wl: f32, ww: f32) -> Result<(LoadedStudy, V
     extra.sort_unstable();
     extra.dedup();
     for id in extra {
-        let count = contours.iter().filter(|c| c.struct_id == id).count();
         structures.push(Structure {
             id,
             name: format!("Structure {id}"),
             rgb: default_rgb(id),
             opacity: 80,
             type_id: 1,
-            contour_count: count,
+            contour_count: contour_counts[id as usize],
         });
     }
 

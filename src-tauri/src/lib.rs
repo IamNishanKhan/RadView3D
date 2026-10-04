@@ -1,12 +1,11 @@
 mod state;
 
-use radview_core::{list_studies, load_study, window::window_hu, StudyInfo, StudyJson};
+use radview_core::{list_studies, load_study, window::window_hu, LoadedStudy, StudyInfo, StudyJson};
 use state::AppState;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::ipc::Response;
 use tauri::State;
-use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
 fn list_patient_studies(path: String) -> Result<Vec<StudyInfo>, String> {
@@ -22,33 +21,32 @@ fn load_study_json(
 ) -> Result<StudyJson, String> {
     let (loaded, volume_u8) =
         load_study(&PathBuf::from(&study_path), wl, ww).map_err(|e| e.to_string())?;
-    let json = loaded.json.clone();
-    *state.hu.lock().unwrap() = Some(loaded.hu);
-    *state.labels.lock().unwrap() = Some(loaded.labels);
+    let LoadedStudy { json, hu, labels } = loaded;
+    *state.hu.lock().unwrap() = Some(Arc::new(hu));
+    *state.labels.lock().unwrap() = Some(labels);
     *state.volume_u8.lock().unwrap() = Some(volume_u8);
-    *state.wl_ww.lock().unwrap() = (wl, ww);
     Ok(json)
 }
 
 #[tauri::command]
-fn get_volume_u8(state: State<AppState>) -> Result<Response, String> {
+fn take_initial_volume_u8(state: State<AppState>) -> Result<Response, String> {
     let bytes = state
         .volume_u8
         .lock()
         .unwrap()
-        .clone()
-        .ok_or_else(|| "No study loaded".to_string())?;
+        .take()
+        .ok_or_else(|| "No initial volume is available".to_string())?;
     Ok(Response::new(bytes))
 }
 
 #[tauri::command]
-fn get_labels_u8(state: State<AppState>) -> Result<Response, String> {
+fn take_initial_labels_u8(state: State<AppState>) -> Result<Response, String> {
     let bytes = state
         .labels
         .lock()
         .unwrap()
-        .clone()
-        .ok_or_else(|| "No study loaded".to_string())?;
+        .take()
+        .ok_or_else(|| "No initial labels are available".to_string())?;
     Ok(Response::new(bytes))
 }
 
@@ -61,8 +59,6 @@ fn rewindow(state: State<AppState>, wl: f32, ww: f32) -> Result<Response, String
         .clone()
         .ok_or_else(|| "No study loaded".to_string())?;
     let volume_u8 = window_hu(&hu, wl, ww);
-    *state.volume_u8.lock().unwrap() = Some(volume_u8.clone());
-    *state.wl_ww.lock().unwrap() = (wl, ww);
     Ok(Response::new(volume_u8))
 }
 
@@ -71,29 +67,6 @@ fn clear_study(state: State<AppState>) {
     *state.hu.lock().unwrap() = None;
     *state.labels.lock().unwrap() = None;
     *state.volume_u8.lock().unwrap() = None;
-    *state.wl_ww.lock().unwrap() = (40.0, 400.0);
-}
-
-fn pick_folder_rfd(app: tauri::AppHandle) -> Option<String> {
-    let (tx, rx) = std::sync::mpsc::sync_channel(1);
-    app.dialog()
-        .file()
-        .set_title("Open Monaco patient folder")
-        .pick_folder(move |folder| {
-            let path = folder
-                .and_then(|p| p.into_path().ok())
-                .map(|p| p.to_string_lossy().into_owned());
-            let _ = tx.send(path);
-        });
-    rx.recv().ok().flatten()
-}
-
-#[tauri::command]
-async fn pick_patient_folder(app: tauri::AppHandle) -> Option<String> {
-    tauri::async_runtime::spawn_blocking(move || pick_folder_rfd(app))
-        .await
-        .ok()
-        .flatten()
 }
 
 #[tauri::command]
@@ -117,14 +90,12 @@ pub fn run() {
             hu: Mutex::new(None),
             labels: Mutex::new(None),
             volume_u8: Mutex::new(None),
-            wl_ww: Mutex::new((40.0, 400.0)),
         })
         .invoke_handler(tauri::generate_handler![
-            pick_patient_folder,
             list_patient_studies,
             load_study_json,
-            get_volume_u8,
-            get_labels_u8,
+            take_initial_volume_u8,
+            take_initial_labels_u8,
             rewindow,
             clear_study,
             exit_app

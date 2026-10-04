@@ -37,10 +37,11 @@ fn fill_polygon(mask: &mut [u8], rows: usize, cols: usize, pts: &[[f32; 2]], val
     let y0 = y_min.floor().max(0.0) as i32;
     let y1 = y_max.ceil().min((rows as f32) - 1.0) as i32;
     let n = pts.len();
+    let mut xs: Vec<f32> = Vec::with_capacity(n);
 
     for y in y0..=y1 {
         let yf = y as f32;
-        let mut xs: Vec<f32> = Vec::new();
+        xs.clear();
         let mut j = n - 1;
         for i in 0..n {
             let y_a = pts[j][1];
@@ -87,10 +88,11 @@ pub fn rasterise(
         };
         let slice = &mut labels[zi * rows * cols..(zi + 1) * rows * cols];
 
-        let mut items = wc.contours.clone();
-        items.sort_by_key(|(id, _)| *id);
+        let mut item_indices: Vec<usize> = (0..wc.contours.len()).collect();
+        item_indices.sort_by_key(|&index| wc.contours[index].0);
 
-        for (sid, pts_mm) in items {
+        for item_index in item_indices {
+            let (sid, pts_mm) = &wc.contours[item_index];
             if pts_mm.len() < 2 {
                 continue;
             }
@@ -98,14 +100,10 @@ pub fn rasterise(
                 .iter()
                 .map(|p| wc_to_pixel(p[0], p[1], volume.origin, volume.spacing))
                 .collect();
-            contours.push(ContourRing {
-                z_index: zi,
-                struct_id: sid,
-                points: pts_px.clone(),
-            });
             if pts_px.len() >= 3 {
-                fill_polygon(slice, rows, cols, &pts_px, sid);
+                fill_polygon(slice, rows, cols, &pts_px, *sid);
             }
+            contours.push(ContourRing { z_index: zi, struct_id: *sid, points: pts_px });
         }
     }
 

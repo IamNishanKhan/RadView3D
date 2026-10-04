@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import radviewIcon from "./assets/radview3d-icon.png";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import radviewIcon from "../src-tauri/icons/128x128.png";
 import {
   ChevronRight, Copy, ExternalLink, FolderClosed, FolderOpen,
   Globe2, Info, LoaderCircle,
@@ -27,13 +28,14 @@ const axes: Axis[] = ["axial", "coronal", "sagittal"];
 const axisNames: Record<Axis, string> = { axial: "Axial", coronal: "Coronal", sagittal: "Sagittal" };
 const windowLabels: Record<string, string> = { soft: "Soft tissue", lung: "Lung", bone: "Bone" };
 const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n));
+const EMPTY_BYTES = new Uint8Array(0);
 
 function displayStudyName(name: string): string {
   return name.match(/CT\d+/i)?.[0] ?? name;
 }
 
 function toU8(data: ArrayBuffer | Uint8Array | number[]): Uint8Array {
-  if (data instanceof Uint8Array) return new Uint8Array(data);
+  if (data instanceof Uint8Array) return data;
   if (data instanceof ArrayBuffer) return new Uint8Array(data);
   return Uint8Array.from(data);
 }
@@ -45,11 +47,12 @@ function App() {
   const renderer = useRef<Renderer | null>(null);
   const closingRef = useRef(false);
   const currentPatientPath = useRef<string | null>(null);
+  const volumeBuffer = useRef<Uint8Array>(EMPTY_BYTES);
+  const labelsBuffer = useRef<Uint8Array>(EMPTY_BYTES);
   const [studies, setStudies] = useState<StudyInfo[]>([]);
   const [studyPath, setStudyPath] = useState("");
   const [json, setJson] = useState<StudyJson | null>(null);
-  const [volume, setVolume] = useState<Uint8Array>(new Uint8Array());
-  const [labels, setLabels] = useState<Uint8Array>(new Uint8Array());
+  const [renderRevision, setRenderRevision] = useState(0);
   const [visible, setVisible] = useState<Set<number>>(new Set());
   const [slices, setSlices] = useState<Record<Axis, number>>({ axial: 0, coronal: 0, sagittal: 0 });
   const [activeAxis, setActiveAxis] = useState<Axis>("axial");
@@ -75,18 +78,18 @@ function App() {
 
   useEffect(() => {
     if (!json || !renderer.current) return;
-    renderer.current.setStudy({ volume, labels, json });
+    renderer.current.setStudy({ volume: volumeBuffer.current, labels: labelsBuffer.current, json });
     const resizeHandlers = axes.map((axis) => {
       const canvas = axis === "axial" ? canvasAxial.current : axis === "coronal" ? canvasCoronal.current : canvasSagittal.current;
       return canvas ? fitCanvasToStage(canvas, paneAspectRatio(axis, json.meta)) : () => {};
     });
     return () => resizeHandlers.forEach((dispose) => dispose());
-  }, [json, labels]);
+  }, [json]);
 
   useEffect(() => {
     if (!json || !renderer.current) return;
     renderer.current.draw({ ax: slices.axial, cor: slices.coronal, sag: slices.sagittal, visible });
-  }, [json, slices, visible, volume]);
+  }, [json, slices, visible, renderRevision]);
 
   const loadStudy = useCallback(async (path: string, preset = windowPreset) => {
     if (!path || loading) return;
@@ -98,12 +101,12 @@ function App() {
         studyPath: path, wl: wlww.wl, ww: wlww.ww,
       });
       const [volBuffer, labelBuffer] = await Promise.all([
-        invoke<ArrayBuffer | Uint8Array | number[]>("get_volume_u8"),
-        invoke<ArrayBuffer | Uint8Array | number[]>("get_labels_u8"),
+        invoke<ArrayBuffer | Uint8Array | number[]>("take_initial_volume_u8"),
+        invoke<ArrayBuffer | Uint8Array | number[]>("take_initial_labels_u8"),
       ]);
+      volumeBuffer.current = toU8(volBuffer);
+      labelsBuffer.current = toU8(labelBuffer);
       setJson(loadedJson);
-      setVolume(toU8(volBuffer));
-      setLabels(toU8(labelBuffer));
       setSlices({
         axial: Math.floor(loadedJson.meta.nz / 2),
         coronal: Math.floor(loadedJson.meta.rows / 2),
@@ -121,7 +124,11 @@ function App() {
 
   const openPatient = useCallback(async () => {
     try {
-      const path = await invoke<string | null>("pick_patient_folder");
+      const path = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Open Monaco patient folder",
+      });
       if (!path) return;
       setLoading(true);
       setStatus("Scanning patient folder…");
@@ -134,7 +141,6 @@ function App() {
       setStudies(found);
       currentPatientPath.current = path;
       setStudyPath(preferred.path);
-      setLoading(false);
       await loadStudy(preferred.path);
     } catch (error) {
       setLoading(false);
@@ -149,11 +155,11 @@ function App() {
       await invoke("clear_study");
       renderer.current?.clear();
       currentPatientPath.current = null;
+      volumeBuffer.current = EMPTY_BYTES;
+      labelsBuffer.current = EMPTY_BYTES;
       setStudies([]);
       setStudyPath("");
       setJson(null);
-      setVolume(new Uint8Array());
-      setLabels(new Uint8Array());
       setVisible(new Set());
       setStatus("No study open");
     } catch (error) {
@@ -170,8 +176,9 @@ function App() {
     try {
       const updated = await invoke<ArrayBuffer | Uint8Array | number[]>("rewindow", { wl: wlww.wl, ww: wlww.ww });
       const pixels = toU8(updated);
+      volumeBuffer.current = pixels;
       renderer.current?.updateVolume(pixels);
-      setVolume(pixels);
+      setRenderRevision((revision) => revision + 1);
       setStatus("");
     } catch (error) {
       setStatus(String(error));

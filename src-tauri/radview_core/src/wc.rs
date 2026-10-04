@@ -21,8 +21,11 @@ pub struct WcFile {
 }
 
 pub fn parse_wc_z_from_filename(name: &str) -> Option<f64> {
-    let re = Regex::new(r"^T\.([+-]?\d+(?:\.\d+)?)\.WC$").ok()?;
-    re.captures(name)
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"^T\.([+-]?\d+(?:\.\d+)?)\.WC$").expect("valid WC filename regex")
+    })
+        .captures(name)
         .and_then(|c| c.get(1)?.as_str().parse().ok())
 }
 

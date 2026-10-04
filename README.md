@@ -69,7 +69,7 @@ chmod +x radview3d-linux
 ### Open a patient folder
 
 1. Launch RadView3D.
-2. Select **Open folder** to open the native Windows folder picker, launched through the app's Rust callback.
+2. Select **Open folder** to open the native Windows folder picker through Tauri's built-in dialog plugin.
 3. Choose the patient directory, not an individual CT study directory.
 4. Wait for the study to load.
 5. Use the **CT1 / CT2** selector in the left sidebar if the patient contains multiple CT studies.

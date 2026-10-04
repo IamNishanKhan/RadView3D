@@ -30,16 +30,22 @@ struct SliceRec {
 }
 
 fn filename_z_dcm(path: &Path) -> Option<f64> {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     let name = path.file_name()?.to_string_lossy();
-    let re = Regex::new(r"([+-]?\d+(?:\.\d+)?)\.CT\.DCM$").ok()?;
-    re.captures(&name.to_ascii_uppercase())
+    RE.get_or_init(|| {
+        Regex::new(r"(?i)([+-]?\d+(?:\.\d+)?)\.CT\.DCM$").expect("valid DICOM filename regex")
+    })
+        .captures(&name)
         .and_then(|c| c.get(1)?.as_str().parse().ok())
 }
 
 fn filename_z_ct(path: &Path) -> Option<f64> {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     let name = path.file_name()?.to_string_lossy();
-    let re = Regex::new(r"^T\.([+-]?\d+(?:\.\d+)?)\.CT$").ok()?;
-    re.captures(&name)
+    RE.get_or_init(|| {
+        Regex::new(r"^T\.([+-]?\d+(?:\.\d+)?)\.CT$").expect("valid CT filename regex")
+    })
+        .captures(&name)
         .and_then(|c| c.get(1)?.as_str().parse().ok())
 }
 
@@ -236,9 +242,11 @@ fn load_dicom_dir(dcm_dir: &Path) -> Result<Vec<SliceRec>> {
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| {
-            p.file_name()
-                .map(|n| n.to_string_lossy().to_ascii_lowercase().ends_with(".dcm"))
-                .unwrap_or(false)
+            let Some(name) = p.file_name().map(|name| name.to_string_lossy()) else {
+                return false;
+            };
+            name.get(name.len().saturating_sub(4)..)
+                .is_some_and(|suffix| suffix.eq_ignore_ascii_case(".dcm"))
         })
         .collect();
     files.sort();

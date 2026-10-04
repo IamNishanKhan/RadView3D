@@ -13,8 +13,7 @@ export interface ViewState {
   visible: Set<number>;
 }
 
-function grayImageData(
-  ctx: CanvasRenderingContext2D,
+function fillGrayImageData(
   src: Uint8Array,
   w: number,
   h: number,
@@ -30,7 +29,6 @@ function grayImageData(
     d[o + 2] = v;
     d[o + 3] = 255;
   }
-  ctx.putImageData(imageData, 0, 0);
 }
 
 function extractAxial(volume: Uint8Array, zi: number, rows: number, cols: number): Uint8Array {
@@ -38,60 +36,55 @@ function extractAxial(volume: Uint8Array, zi: number, rows: number, cols: number
   return volume.subarray(off, off + rows * cols);
 }
 
-function extractCoronal(volume: Uint8Array, yi: number, nz: number, rows: number, cols: number): Uint8Array {
-  const out = new Uint8Array(nz * cols);
+function extractCoronal(volume: Uint8Array, yi: number, nz: number, rows: number, cols: number, out: Uint8Array): void {
   for (let z = 0; z < nz; z++) {
     const src = z * rows * cols + yi * cols;
     out.set(volume.subarray(src, src + cols), z * cols);
   }
-  return out;
 }
 
-function extractSagittal(volume: Uint8Array, xi: number, nz: number, rows: number, cols: number): Uint8Array {
-  const out = new Uint8Array(nz * rows);
+function extractSagittal(volume: Uint8Array, xi: number, nz: number, rows: number, cols: number, out: Uint8Array): void {
   for (let z = 0; z < nz; z++) {
     const base = z * rows * cols;
     for (let y = 0; y < rows; y++) {
       out[z * rows + y] = volume[base + y * cols + xi];
     }
   }
-  return out;
 }
 
 function paintOutline(
-  ctx: CanvasRenderingContext2D,
+  imageData: ImageData,
   labels: Uint8Array,
   w: number,
   h: number,
   visible: Set<number>,
   colors: Map<number, [number, number, number]>,
 ) {
-  const img = ctx.getImageData(0, 0, w, h);
-  const d = img.data;
-  const at = (x: number, y: number) => labels[y * w + x];
+  const d = imageData.data;
   for (let y = 0; y < h; y++) {
+    const row = y * w;
     for (let x = 0; x < w; x++) {
-      const id = at(x, y);
+      const index = row + x;
+      const id = labels[index];
       if (!id || !visible.has(id)) continue;
       const border =
         x === 0 ||
         y === 0 ||
         x === w - 1 ||
         y === h - 1 ||
-        at(x - 1, y) !== id ||
-        at(x + 1, y) !== id ||
-        at(x, y - 1) !== id ||
-        at(x, y + 1) !== id;
+        labels[index - 1] !== id ||
+        labels[index + 1] !== id ||
+        labels[index - w] !== id ||
+        labels[index + w] !== id;
       if (!border) continue;
       const rgb = colors.get(id) ?? [255, 255, 0];
-      const o = (y * w + x) * 4;
+      const o = index * 4;
       d[o] = rgb[0];
       d[o + 1] = rgb[1];
       d[o + 2] = rgb[2];
       d[o + 3] = 255;
     }
   }
-  ctx.putImageData(img, 0, 0);
 }
 
 function drawPolylines(
@@ -145,6 +138,10 @@ export class Renderer {
   private axImg: ImageData | null = null;
   private corImg: ImageData | null = null;
   private sagImg: ImageData | null = null;
+  private corSlice = new Uint8Array(0);
+  private corLabels = new Uint8Array(0);
+  private sagSlice = new Uint8Array(0);
+  private sagLabels = new Uint8Array(0);
   private buffers: ViewerBuffers | null = null;
   private colors = new Map<number, [number, number, number]>();
   private axialByZ = new Map<number, ContourRing[]>();
@@ -153,9 +150,9 @@ export class Renderer {
     this.axial = axial;
     this.coronal = coronal;
     this.sagittal = sagittal;
-    this.axCtx = axial.getContext("2d", { willReadFrequently: true })!;
-    this.corCtx = coronal.getContext("2d", { willReadFrequently: true })!;
-    this.sagCtx = sagittal.getContext("2d", { willReadFrequently: true })!;
+    this.axCtx = axial.getContext("2d")!;
+    this.corCtx = coronal.getContext("2d")!;
+    this.sagCtx = sagittal.getContext("2d")!;
   }
 
   setStudy(buffers: ViewerBuffers) {
@@ -170,6 +167,10 @@ export class Renderer {
     this.axImg = this.axCtx.createImageData(cols, rows);
     this.corImg = this.corCtx.createImageData(cols, nz);
     this.sagImg = this.sagCtx.createImageData(rows, nz);
+    this.corSlice = new Uint8Array(nz * cols);
+    this.corLabels = new Uint8Array(nz * cols);
+    this.sagSlice = new Uint8Array(nz * rows);
+    this.sagLabels = new Uint8Array(nz * rows);
     this.colors.clear();
     for (const s of buffers.json.structures) {
       this.colors.set(s.id, s.rgb);
@@ -191,6 +192,10 @@ export class Renderer {
     this.axImg = null;
     this.corImg = null;
     this.sagImg = null;
+    this.corSlice = new Uint8Array(0);
+    this.corLabels = new Uint8Array(0);
+    this.sagSlice = new Uint8Array(0);
+    this.sagLabels = new Uint8Array(0);
     this.colors.clear();
     this.axialByZ.clear();
     for (const canvas of [this.axial, this.coronal, this.sagittal]) {
@@ -209,20 +214,27 @@ export class Renderer {
     const cor = clamp(state.cor, 0, rows - 1);
     const sag = clamp(state.sag, 0, cols - 1);
 
-    grayImageData(this.axCtx, extractAxial(b.volume, ax, rows, cols), cols, rows, this.axImg);
+    fillGrayImageData(extractAxial(b.volume, ax, rows, cols), cols, rows, this.axImg);
+    this.axCtx.putImageData(this.axImg, 0, 0);
     drawPolylines(this.axCtx, this.axialByZ.get(ax) ?? [], state.visible, this.colors);
     drawCrosshair(this.axCtx, cols, rows, sag, cor);
 
-    const corSlice = extractCoronal(b.volume, cor, nz, rows, cols);
-    grayImageData(this.corCtx, corSlice, cols, nz, this.corImg);
-    const corLabels = extractCoronal(b.labels, cor, nz, rows, cols);
-    paintOutline(this.corCtx, corLabels, cols, nz, state.visible, this.colors);
+    extractCoronal(b.volume, cor, nz, rows, cols, this.corSlice);
+    fillGrayImageData(this.corSlice, cols, nz, this.corImg);
+    if (state.visible.size) {
+      extractCoronal(b.labels, cor, nz, rows, cols, this.corLabels);
+      paintOutline(this.corImg, this.corLabels, cols, nz, state.visible, this.colors);
+    }
+    this.corCtx.putImageData(this.corImg, 0, 0);
     drawCrosshair(this.corCtx, cols, nz, sag, ax);
 
-    const sagSlice = extractSagittal(b.volume, sag, nz, rows, cols);
-    grayImageData(this.sagCtx, sagSlice, rows, nz, this.sagImg);
-    const sagLabels = extractSagittal(b.labels, sag, nz, rows, cols);
-    paintOutline(this.sagCtx, sagLabels, rows, nz, state.visible, this.colors);
+    extractSagittal(b.volume, sag, nz, rows, cols, this.sagSlice);
+    fillGrayImageData(this.sagSlice, rows, nz, this.sagImg);
+    if (state.visible.size) {
+      extractSagittal(b.labels, sag, nz, rows, cols, this.sagLabels);
+      paintOutline(this.sagImg, this.sagLabels, rows, nz, state.visible, this.colors);
+    }
+    this.sagCtx.putImageData(this.sagImg, 0, 0);
     drawCrosshair(this.sagCtx, rows, nz, cor, ax);
   }
 }
